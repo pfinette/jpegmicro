@@ -16,8 +16,11 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_title("JPEGmicro")
             .with_inner_size([760.0, 540.0])
-            .with_min_inner_size([560.0, 360.0])
-            .with_drag_and_drop(true),
+            .with_min_inner_size([660.0, 360.0])
+            .with_drag_and_drop(true)
+            .with_fullsize_content_view(true)
+            .with_titlebar_shown(false)
+            .with_title_shown(false),
         ..Default::default()
     };
     eframe::run_native("JPEGmicro", options, Box::new(|cc| Ok(Box::new(App::new(cc)))))
@@ -80,13 +83,23 @@ fn install_style(ctx: &egui::Context) {
         ctx.style_mut_of(theme, |style| {
             for (text_style, size) in [
                 (TextStyle::Heading, 22.0),
-                (TextStyle::Body, 13.5),
-                (TextStyle::Button, 13.5),
-                (TextStyle::Small, 11.5),
+                (TextStyle::Body, 13.0),
+                (TextStyle::Button, 13.0),
+                (TextStyle::Small, 11.0),
             ] {
                 style.text_styles.insert(text_style, FontId::proportional(size));
             }
+
+            // macOS conventions: overlay scrollbars, delayed tooltips, labels that aren't selectable, 22 pt controls.
+            style.spacing.scroll = egui::style::ScrollStyle::floating();
+            style.spacing.interact_size.y = 22.0;
+            style.interaction.tooltip_delay = 0.6;
+            style.interaction.selectable_labels = false;
+
             let v = &mut style.visuals;
+            for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active, &mut v.widgets.open] {
+                w.corner_radius = egui::CornerRadius::same(6);
+            }
             v.panel_fill = p.bg;
             v.window_fill = p.chrome;
             v.extreme_bg_color = p.track;
@@ -183,8 +196,21 @@ impl App {
         });
     }
 
+    /// Sits in the title bar, beside the traffic lights.
     fn settings_bar(&mut self, ui: &mut egui::Ui) {
         let p = palette(ui);
+
+        // The bar is the title bar: drag to move, double-click to zoom. Widgets added later take the clicks.
+        let bar = Rect::from_min_max(pos2(0.0, 0.0), pos2(ui.ctx().content_rect().right(), ui.max_rect().bottom()));
+        let background = ui.interact(bar, ui.scope_id().with("titlebar"), Sense::click_and_drag());
+        if background.drag_started() {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+        }
+        if background.double_clicked() {
+            let zoomed = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!zoomed));
+        }
+
         ui.horizontal(|ui| {
             ui.label("Strictness");
             egui::ComboBox::from_id_salt("strictness")
@@ -217,12 +243,12 @@ impl App {
         }
         let c = rect.center();
         let title = if hovering { "Release to shrink" } else { "Drop photos or folders" };
-        painter.text(c - vec2(0.0, 14.0), Align2::CENTER_CENTER, title, FontId::proportional(24.0), p.text);
+        painter.text(c - vec2(0.0, 14.0), Align2::CENTER_CENTER, title, FontId::proportional(22.0), p.text);
         painter.text(
-            c + vec2(0.0, 18.0),
+            c + vec2(0.0, 16.0),
             Align2::CENTER_CENTER,
             "Each JPEG gets as small as it can without looking different.",
-            FontId::proportional(13.5),
+            FontId::proportional(13.0),
             p.muted,
         );
     }
@@ -284,7 +310,7 @@ fn file_row(ui: &mut egui::Ui, row: &Row, largest: u64) {
     let p = palette(ui);
     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
     let painter = ui.painter_at(rect);
-    let font = FontId::proportional(13.5);
+    let font = FontId::proportional(13.0);
     let cy = rect.center().y;
 
     let name = row.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -304,7 +330,7 @@ fn file_row(ui: &mut egui::Ui, row: &Row, largest: u64) {
     };
     let status_text = |text: &str, color: Color32| right_text(text.into(), info_right, color);
 
-    match &row.status {
+    let detail = match &row.status {
         Status::Done(Outcome::Compressed { before, after, quality, dssim }) => {
             let kept_w = (full * *after as f32 / *before as f32).round();
             painter.rect_filled(Rect::from_min_size(bar.min, vec2(kept_w, BAR_HEIGHT)), 2.0, p.kept);
@@ -312,11 +338,11 @@ fn file_row(ui: &mut egui::Ui, row: &Row, largest: u64) {
             right_text(before_after(*before, *after), info_right - PCT_WIDTH, p.text);
             let pct = (before - after) as f64 * 100.0 / *before as f64;
             right_text(format!("−{pct:.0}%"), info_right, p.saved);
-            response.on_hover_text(format!("{}\nQuality {quality}, DSSIM {dssim:.5}", row.path.display()));
+            Some(format!("Quality {quality}, DSSIM {dssim:.5}"))
         }
         status => {
             painter.rect_filled(bar, 2.0, p.track);
-            let tip = match status {
+            match status {
                 Status::Queued => {
                     status_text("Queued", p.muted);
                     None
@@ -346,14 +372,21 @@ fn file_row(ui: &mut egui::Ui, row: &Row, largest: u64) {
                     None
                 }
                 Status::Done(Outcome::Compressed { .. }) => unreachable!(),
-            };
-            let path = row.path.display().to_string();
-            response.on_hover_text(match tip {
-                Some(t) => format!("{path}\n{t}"),
-                None => path,
-            });
+            }
         }
-    }
+    };
+
+    let path = row.path.display().to_string();
+    let tip = match detail {
+        Some(d) => format!("{path}\n{d}"),
+        None => path,
+    };
+    response.on_hover_text(tip).context_menu(|ui| {
+        if ui.button("Show in Finder").clicked() {
+            let _ = std::process::Command::new("open").arg("-R").arg(&row.path).spawn();
+            ui.close();
+        }
+    });
 }
 
 /// Fill `area` with a grid of small squares.
@@ -402,9 +435,17 @@ impl eframe::App for App {
         if !dropped.is_empty() {
             self.enqueue(dropped, &ctx);
         }
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::W)) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+
+        // Left margin clears the traffic lights; 5 + 22 + 5 pt centers the controls on them.
+        let toolbar = egui::Frame::side_top_panel(ui.style())
+            .fill(p.chrome)
+            .inner_margin(egui::Margin { left: 80, right: 12, top: 5, bottom: 5 });
+        egui::Panel::top("settings").frame(toolbar).show(ui, |ui| self.settings_bar(ui));
 
         let chrome = egui::Frame::side_top_panel(ui.style()).fill(p.chrome).inner_margin(egui::Margin::symmetric(14, 10));
-        egui::Panel::top("settings").frame(chrome).show(ui, |ui| self.settings_bar(ui));
         if !self.rows.is_empty() {
             egui::Panel::bottom("footer").frame(chrome).show(ui, |ui| self.footer(ui));
         }

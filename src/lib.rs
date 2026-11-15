@@ -458,15 +458,11 @@ fn verify_jpeg(path: &Path, expected_len: usize) -> io::Result<()> {
 }
 
 fn file_times(meta: &fs::Metadata) -> io::Result<fs::FileTimes> {
-    let times = fs::FileTimes::new().set_modified(meta.modified()?).set_accessed(meta.accessed()?);
-
-    #[cfg(target_os = "macos")]
-    let times = {
-        use std::os::macos::fs::FileTimesExt;
-        times.set_created(meta.created()?)
-    };
-
-    Ok(times)
+    use std::os::macos::fs::FileTimesExt;
+    Ok(fs::FileTimes::new()
+        .set_modified(meta.modified()?)
+        .set_accessed(meta.accessed()?)
+        .set_created(meta.created()?))
 }
 
 fn copy_xattrs(from: &Path, to: &Path) {
@@ -479,16 +475,11 @@ fn copy_xattrs(from: &Path, to: &Path) {
 }
 
 fn move_to_trash(path: &Path) -> io::Result<()> {
-    #[allow(unused_mut)]
-    let mut ctx = trash::TrashContext::default();
+    use trash::macos::{DeleteMethod, TrashContextExtMacos};
 
     // NSFileManager needs no Automation permission, unlike the Finder method.
-    #[cfg(target_os = "macos")]
-    {
-        use trash::macos::{DeleteMethod, TrashContextExtMacos};
-        ctx.set_delete_method(DeleteMethod::NsFileManager);
-    }
-
+    let mut ctx = trash::TrashContext::default();
+    ctx.set_delete_method(DeleteMethod::NsFileManager);
     ctx.delete(path).map_err(|e| io::Error::other(format!("couldn't move original to Trash: {e}")))
 }
 

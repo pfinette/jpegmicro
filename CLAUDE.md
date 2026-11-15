@@ -6,7 +6,7 @@ Personal use only. It won't be distributed or notarized.
 
 ## Status
 
-- Written on Linux, then built and tested on macOS (M5, rustc 1.100). It compiled with no changes.
+- macOS only. It was first written on Linux; the Linux code paths are gone.
 - `cargo build --release`, `cargo clippy --all-targets` and `cargo test` are clean.
 - The CLI, metadata and speed are verified on macOS. The GUI items below are not.
 
@@ -76,9 +76,12 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
 | Saved (accent) | `#5B9BE6` | `#1F5FB0` |
 | Error | `#E5735F` | `#C2412D` |
 
+- The settings bar is the title bar: full-size content view, hidden title, a left inset that clears the traffic lights, and 5 + 22 + 5 pt height so controls center on them. Dragging its background moves the window; double-clicking zooms.
+- macOS conventions: 13 pt text, 22 pt controls with 6 pt corners, overlay scrollbars, a 0.6 s tooltip delay, labels that can't be selected, and ⌘W to close.
+- Right-clicking a row offers Show in Finder (`open -R`).
 - The whole window is the drop target. With no files it shows centered text; while files hover it shows an accent outline.
 - Working rows get a brighter bar and full-color text. Queued and skipped rows stay muted. Detail goes in hover tooltips.
-- egui stops repainting a window that macOS reports as covered, so screenshots of a background window show stale progress.
+- egui stops repainting a window that macOS reports as covered, so screenshots of a background window show stale progress. For the same reason a Dock bounce when a batch finishes wouldn't fire reliably, so there is none.
 
 ## Settings
 
