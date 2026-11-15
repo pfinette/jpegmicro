@@ -1,0 +1,41 @@
+[package]
+name = "jpegmicro"
+version = "0.1.0"
+edition = "2024"
+description = "Drop JPEGs on a window; they get smaller without looking different."
+publish = false
+
+[lib]
+name = "jpegmicro"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jpegmicro"
+path = "src/main.rs"
+
+[[bin]]
+name = "jpegmicro-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+dssim-core = "3.5"
+eframe = { version = "0.37", features = ["persistence"] }
+mozjpeg = "0.10"
+rayon = "1"
+rgb = "0.8.53"
+serde = { version = "1", features = ["derive"] }
+trash = "5"
+xattr = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+# MozJPEG reports errors by panicking, so panics must unwind.
+panic = "unwind"
+
+[profile.dev]
+
+# Debug builds of the codecs are unusably slow.
+opt-level = 2
