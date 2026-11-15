@@ -492,7 +492,7 @@ fn move_to_trash(path: &Path) -> io::Result<()> {
     ctx.delete(path).map_err(|e| io::Error::other(format!("couldn't move original to Trash: {e}")))
 }
 
-/// Human-readable byte size, e.g. "3.4 MB".
+/// Human-readable byte size, e.g. "722 KB" or "3.4 MB".
 pub fn format_size(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
     let mut v = bytes as f64;
@@ -501,7 +501,11 @@ pub fn format_size(bytes: u64) -> String {
         v /= 1000.0;
         unit += 1;
     }
-    if unit == 0 { format!("{bytes} B") } else { format!("{v:.1} {}", UNITS[unit]) }
+    match unit {
+        0 => format!("{bytes} B"),
+        1 => format!("{v:.0} KB"),
+        _ => format!("{v:.1} {}", UNITS[unit]),
+    }
 }
 
 /// Thread pool for processing files. Scoring takes about 2 GB per 12 MP photo

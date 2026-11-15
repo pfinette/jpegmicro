@@ -26,7 +26,7 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
 | Path | Contents |
 |---|---|
 | `src/lib.rs` | Pipeline: `collect_jpegs`, `process_file`, `analyze`, `replace_file`, `worker_pool` |
-| `src/main.rs` | eframe/egui app: drop zone, file grid, footer totals, persisted prefs |
+| `src/main.rs` | eframe/egui app: palettes and fonts, settings bar, empty state, file rows with size bars, footer totals, persisted prefs |
 | `src/bin/cli.rs` | CLI with `--strict/--balanced/--aggressive`, `--min-saving N`, `--dry-run` |
 | `bundle.sh` | Builds the .app; makes the .icns with `sips` + `iconutil` |
 | `assets/icon.png` | 1024 px icon source (blue rounded square with "μ" and "JPEG") |
@@ -60,6 +60,25 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
    6. Rename the temp file into place.
 
    On any error the temp file is removed and the original stays untouched.
+
+## Design (`src/main.rs`)
+
+- Each row has a bar as long as the original file, relative to the largest file in the list. Kept bytes are solid graphite. Removed bytes are small blocks in cyanotype blue, after JPEG's 8×8 blocks. This is the one bold element; everything else stays quiet.
+- Type is SF Pro, loaded from `/System/Library/Fonts/SFNS.ttf` at startup, with egui's default font as fallback. It loads at the variable font's default weight, so hierarchy comes from size and color.
+- The palettes follow the system theme.
+
+| Token | Dark | Light |
+|---|---|---|
+| Background | `#1C2026` | `#F3F5F7` |
+| Chrome (bars) | `#22272E` | `#E8ECF0` |
+| Text / muted | `#E4E7EB` / `#8B949E` | `#1D2228` / `#646D77` |
+| Kept | `#5E6873` | `#98A3AF` |
+| Saved (accent) | `#5B9BE6` | `#1F5FB0` |
+| Error | `#E5735F` | `#C2412D` |
+
+- The whole window is the drop target. With no files it shows centered text; while files hover it shows an accent outline.
+- Working rows get a brighter bar and full-color text. Queued and skipped rows stay muted. Detail goes in hover tooltips.
+- egui stops repainting a window that macOS reports as covered, so screenshots of a background window show stale progress.
 
 ## Settings
 
