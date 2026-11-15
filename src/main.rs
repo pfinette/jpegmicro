@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::Arc;
 
 use eframe::egui::{self, Align, Color32, Layout, RichText, Sense, Stroke, StrokeKind};
 use jpegmicro::{Outcome, Settings, Strictness, collect_jpegs, format_size, process_file, worker_pool};
@@ -48,7 +47,7 @@ struct App {
     rows: Vec<Row>,
     tx: Sender<(usize, Status)>,
     rx: Receiver<(usize, Status)>,
-    pool: Arc<rayon::ThreadPool>,
+    pool: rayon::ThreadPool,
 
     /// Paths given on the command line, processed on the first frame.
     launch_paths: Vec<PathBuf>,
@@ -59,7 +58,7 @@ impl App {
         let prefs = cc.storage.and_then(|s| eframe::get_value(s, eframe::APP_KEY)).unwrap_or_default();
         let (tx, rx) = channel();
         let launch_paths = std::env::args_os().skip(1).map(PathBuf::from).collect();
-        Self { prefs, rows: Vec::new(), tx, rx, pool: Arc::new(worker_pool()), launch_paths }
+        Self { prefs, rows: Vec::new(), tx, rx, pool: worker_pool(), launch_paths }
     }
 
     fn busy(&self) -> bool {
@@ -67,18 +66,12 @@ impl App {
     }
 
     fn enqueue(&mut self, dropped: Vec<PathBuf>, ctx: &egui::Context) {
-        let files = collect_jpegs(&dropped);
+        // Skip files already in the list that are queued or running.
+        let mut files = collect_jpegs(&dropped);
+        files.retain(|f| !self.rows.iter().any(|r| &r.path == f && matches!(r.status, Status::Queued | Status::Working)));
         if files.is_empty() {
             return;
         }
-
-        // Skip files already in the list that are queued or running.
-        let files: Vec<PathBuf> = files
-            .into_iter()
-            .filter(|f| {
-                !self.rows.iter().any(|r| &r.path == f && matches!(r.status, Status::Queued | Status::Working))
-            })
-            .collect();
 
         let start = self.rows.len();
         self.rows.extend(files.iter().map(|p| Row { path: p.clone(), status: Status::Queued }));
@@ -86,19 +79,16 @@ impl App {
         let settings = Settings::new(self.prefs.strictness, self.prefs.min_saving_percent);
         let tx = self.tx.clone();
         let ctx = ctx.clone();
-        let pool = self.pool.clone();
-        std::thread::spawn(move || {
-            pool.install(|| {
-                files.par_iter().enumerate().for_each_with(tx, |tx, (i, path)| {
-                    let _ = tx.send((start + i, Status::Working));
-                    ctx.request_repaint();
-                    let status = match process_file(path, &settings) {
-                        Ok(outcome) => Status::Done(outcome),
-                        Err(e) => Status::Failed(e),
-                    };
-                    let _ = tx.send((start + i, status));
-                    ctx.request_repaint();
-                });
+        self.pool.spawn(move || {
+            files.par_iter().enumerate().for_each_with(tx, |tx, (i, path)| {
+                let _ = tx.send((start + i, Status::Working));
+                ctx.request_repaint();
+                let status = match process_file(path, &settings) {
+                    Ok(outcome) => Status::Done(outcome),
+                    Err(e) => Status::Failed(e),
+                };
+                let _ = tx.send((start + i, status));
+                ctx.request_repaint();
             });
         });
     }
@@ -157,15 +147,11 @@ impl App {
                     ui.label(name).on_hover_text(row.path.display().to_string());
                     match &row.status {
                         Status::Queued => {
-                            ui.label("");
-                            ui.label("");
-                            ui.label("");
+                            blank(ui, 3);
                             ui.label(RichText::new("Queued").weak());
                         }
                         Status::Working => {
-                            ui.label("");
-                            ui.label("");
-                            ui.label("");
+                            blank(ui, 3);
                             ui.horizontal(|ui| {
                                 ui.spinner();
                                 ui.label("Working");
@@ -173,9 +159,7 @@ impl App {
                         }
                         Status::Done(o) => outcome_cells(ui, o),
                         Status::Failed(e) => {
-                            ui.label("");
-                            ui.label("");
-                            ui.label("");
+                            blank(ui, 3);
                             ui.label(RichText::new("Error").color(Color32::from_rgb(220, 80, 70))).on_hover_text(e);
                         }
                     }
@@ -209,6 +193,13 @@ impl App {
     }
 }
 
+/// Empty grid cells.
+fn blank(ui: &mut egui::Ui, n: usize) {
+    for _ in 0..n {
+        ui.label("");
+    }
+}
+
 fn outcome_cells(ui: &mut egui::Ui, o: &Outcome) {
     match o {
         Outcome::Compressed { before, after, quality, dssim } => {
@@ -220,14 +211,12 @@ fn outcome_cells(ui: &mut egui::Ui, o: &Outcome) {
         }
         Outcome::AlreadyProcessed { size } => {
             ui.label(format_size(*size));
-            ui.label("");
-            ui.label("");
+            blank(ui, 2);
             ui.label(RichText::new("Already done").weak());
         }
         Outcome::NoGain { size, best } => {
             ui.label(format_size(*size));
-            ui.label("");
-            ui.label("");
+            blank(ui, 2);
             let tip = match best {
                 Some(b) => format!("Best result was {}, not enough smaller", format_size(*b)),
                 None => "No quality setting stayed visually identical".into(),
@@ -236,8 +225,7 @@ fn outcome_cells(ui: &mut egui::Ui, o: &Outcome) {
         }
         Outcome::Skipped { size, reason } => {
             ui.label(format_size(*size));
-            ui.label("");
-            ui.label("");
+            blank(ui, 2);
             ui.label(RichText::new(format!("Skipped: {reason}")).weak());
         }
     }

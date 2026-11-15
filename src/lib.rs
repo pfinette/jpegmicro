@@ -11,11 +11,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use dssim_core::{Dssim, DssimImage};
 use mozjpeg::{ALL_MARKERS, ColorSpace, Compress, Decompress, Marker, PixelDensity};
-use rgb::{ComponentBytes, RGB8};
+use rgb::RGB8;
 use serde::{Deserialize, Serialize};
 
 /// Prefix of the COM marker written into every file JPEGmicro produces.
 pub const TAG_PREFIX: &[u8] = b"JPEGmicro v1";
+
+/// Quality range the search covers.
+const Q_MIN: u8 = 40;
+const Q_MAX: u8 = 95;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Strictness {
@@ -56,13 +60,10 @@ impl Strictness {
 
 #[derive(Clone, Debug)]
 pub struct Settings {
-    pub max_dssim: f64,
+    pub strictness: Strictness,
 
     /// Minimum size reduction, as a fraction (0.05 = 5%), for a file to be replaced.
     pub min_saving: f64,
-    pub q_min: u8,
-    pub q_max: u8,
-    pub seed_q: u8,
 
     /// Analyze only; never touch files on disk.
     pub dry_run: bool,
@@ -70,14 +71,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn new(strictness: Strictness, min_saving_percent: f64) -> Self {
-        Self {
-            max_dssim: strictness.max_dssim(),
-            min_saving: min_saving_percent / 100.0,
-            q_min: 40,
-            q_max: 95,
-            seed_q: strictness.seed_q(),
-            dry_run: false,
-        }
+        Self { strictness, min_saving: min_saving_percent / 100.0, dry_run: false }
     }
 }
 
@@ -261,19 +255,7 @@ fn analyze_inner(bytes: &[u8], settings: &Settings) -> Result<Analysis, String> 
     };
     let density = d.pixel_density();
     let (width, height) = d.size();
-
-    let pixels = if gray {
-        let mut img = d.grayscale().map_err(|e| e.to_string())?;
-        let px: Vec<u8> = img.read_scanlines().map_err(|e| e.to_string())?;
-        img.finish().map_err(|e| e.to_string())?;
-        px
-    } else {
-        let mut img = d.rgb().map_err(|e| e.to_string())?;
-        let px: Vec<RGB8> = img.read_scanlines().map_err(|e| e.to_string())?;
-        img.finish().map_err(|e| e.to_string())?;
-        px.as_bytes().to_vec()
-    };
-
+    let pixels = read_pixels(d, gray)?;
     let src = Source { width, height, gray, pixels, markers, chroma, density };
 
     let dssim = Dssim::new();
@@ -286,10 +268,10 @@ fn analyze_inner(bytes: &[u8], settings: &Settings) -> Result<Analysis, String> 
 
     // Probes can run two at a time, so keep the lowest passing candidate.
     let best: Mutex<Option<(u8, Vec<u8>, f64)>> = Mutex::new(None);
-    lowest_passing(settings.q_min, settings.q_max, settings.seed_q, paired, |q| {
+    lowest_passing(Q_MIN, Q_MAX, settings.strictness.seed_q(), paired, |q| {
         let candidate = encode(&src, q)?;
         let score = score(&dssim, &reference, &candidate, src.gray)?;
-        let ok = score <= settings.max_dssim;
+        let ok = score <= settings.strictness.max_dssim();
         if ok {
             let mut best = best.lock().unwrap();
             if best.as_ref().is_none_or(|(b, ..)| q < *b) {
@@ -412,20 +394,18 @@ fn dssim_image(dssim: &Dssim, pixels: &[u8], gray: bool, w: usize, h: usize) -> 
     }
 }
 
+/// Interleaved RGB bytes, or one byte per pixel when `gray`.
+fn read_pixels(d: Decompress<&[u8]>, gray: bool) -> Result<Vec<u8>, String> {
+    let mut img = if gray { d.grayscale() } else { d.rgb() }.map_err(|e| e.to_string())?;
+    let px = img.read_scanlines::<u8>().map_err(|e| e.to_string())?;
+    img.finish().map_err(|e| e.to_string())?;
+    Ok(px)
+}
+
 fn score(dssim: &Dssim, reference: &DssimImage<f32>, jpeg: &[u8], gray: bool) -> Result<f64, String> {
     let d = Decompress::new_mem(jpeg).map_err(|e| e.to_string())?;
     let (w, h) = d.size();
-    let pixels = if gray {
-        let mut img = d.grayscale().map_err(|e| e.to_string())?;
-        let px: Vec<u8> = img.read_scanlines().map_err(|e| e.to_string())?;
-        img.finish().map_err(|e| e.to_string())?;
-        px
-    } else {
-        let mut img = d.rgb().map_err(|e| e.to_string())?;
-        let px: Vec<RGB8> = img.read_scanlines().map_err(|e| e.to_string())?;
-        img.finish().map_err(|e| e.to_string())?;
-        px.as_bytes().to_vec()
-    };
+    let pixels = read_pixels(d, gray)?;
     let candidate = dssim_image(dssim, &pixels, gray, w, h).ok_or("compare failed")?;
     let (val, _) = dssim.compare(reference, candidate);
     Ok(val.into())
@@ -524,8 +504,8 @@ pub fn format_size(bytes: u64) -> String {
     if unit == 0 { format!("{bytes} B") } else { format!("{v:.1} {}", UNITS[unit]) }
 }
 
-/// Thread pool for processing files. Each 24 MP photo needs several hundred MB
-/// while it's being scored, so concurrency is capped to keep memory in check.
+/// Thread pool for processing files. Scoring takes about 2 GB per 12 MP photo
+/// and 4 GB per 24 MP photo, so concurrency is capped to keep memory in check.
 pub fn worker_pool() -> rayon::ThreadPool {
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new()
