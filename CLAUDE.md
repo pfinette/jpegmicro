@@ -63,24 +63,23 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
 
 ## Design (`src/main.rs`)
 
-- Each row has a bar as long as the original file, relative to the largest file in the list. Kept bytes are solid graphite. Removed bytes are small blocks in cyanotype blue, after JPEG's 8×8 blocks. This is the one bold element; everything else stays quiet.
-- Type is SF Pro, loaded from `/System/Library/Fonts/SFNS.ttf` at startup, with egui's default font as fallback. It loads at the variable font's default weight, so hierarchy comes from size and color.
-- The palettes follow the system theme.
+Hardware skin, after Klevgrand plugins, Ableton Live and fm1-sampler: the window is a device with a faceplate, a recessed screen and a few physical controls.
 
-| Token | Dark | Light |
+- Title strip (in the title bar, beside the traffic lights): spaced JPEGMICRO wordmark, a dim "Originals go to the Trash" legend and a status LCD (READY, WORKING 3/12, DONE 12/12). Dragging the strip moves the window; double-clicking zooms.
+- Screen: one track per file. Each track's LED meter is as long as the original file, relative to the largest in the list. Kept bytes light grey segments; removed bytes light orange. Statuses are uppercase LCD text; details go in tooltips; right-click offers Show in Finder.
+- Control row: a three-position STRICTNESS switch, a MIN SAVING arc knob (drag up or down, arrow keys when focused, double-click resets to 5%), an orange SAVED readout and a CLEAR button. Custom controls report accessibility roles (radio button, slider, button).
+- Orange `#FF6A1F` is the only accent and always means saved bytes or the active setting.
+- Type: DIN Alternate Bold for the wordmark and faceplate labels, SF Mono on screens, SF Pro for tooltips and menus. All load from the system at startup, with egui's fonts as fallback.
+
+| Token | Light face | Dark face |
 |---|---|---|
-| Background | `#1C2026` | `#F3F5F7` |
-| Chrome (bars) | `#22272E` | `#E8ECF0` |
-| Text / muted | `#E4E7EB` / `#8B949E` | `#1D2228` / `#646D77` |
-| Kept | `#5E6873` | `#98A3AF` |
-| Saved (accent) | `#5B9BE6` | `#1F5FB0` |
-| Error | `#E5735F` | `#C2412D` |
+| Face / groove | `#E7E5DF` / `#C9C5BC` | `#2B2B2A` / `#444442` |
+| Ink / dim | `#1B1B1A` / `#6F6C66` | `#ECEAE4` / `#9A978F` |
+| Screen / edge | `#1A1B1D` / `#9C9890` | `#17181A` / `#0E0E0F` |
+| Screen text / dim | `#E6E4DE` / `#828488` | same |
+| Segment off / kept | `#2C2E32` / `#9A9DA3` | same |
 
-- The settings bar is the title bar: full-size content view, hidden title, a left inset that clears the traffic lights, and 5 + 22 + 5 pt height so controls center on them. Dragging its background moves the window; double-clicking zooms.
-- macOS conventions: 13 pt text, 22 pt controls with 6 pt corners, overlay scrollbars, a 0.6 s tooltip delay, labels that can't be selected, and ⌘W to close.
-- Right-clicking a row offers Show in Finder (`open -R`).
-- The whole window is the drop target. With no files it shows centered text; while files hover it shows an accent outline.
-- Working rows get a brighter bar and full-color text. Queued and skipped rows stay muted. Detail goes in hover tooltips.
+- macOS conventions: overlay scrollbars, a 0.6 s tooltip delay, labels that can't be selected, and ⌘W to close.
 - egui stops repainting a window that macOS reports as covered, so screenshots of a background window show stale progress. For the same reason a Dock bounce when a batch finishes wouldn't fire reliably, so there is none.
 
 ## Settings
