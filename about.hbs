@@ -1,0 +1,39 @@
+THIRD-PARTY LICENSES
+====================
+
+JPEGmicro release binaries include the third-party software listed below.
+JPEGmicro's own source code is under the MIT License (see LICENSE).
+
+Release binaries link dssim-core, which is licensed under AGPL-3.0, so the
+distributed application as a whole is licensed under AGPL-3.0. Source code:
+https://github.com/pfinette/jpegmicro
+
+This software is based in part on the work of the Independent JPEG Group.
+
+MozJPEG / libjpeg-turbo (via mozjpeg-sys) is distributed under the IJG
+License, the BSD 3-Clause License and the zlib License. Their full texts
+appear below.
+
+
+OVERVIEW
+--------
+{{#each overview}}
+{{{name}}} ({{count}})
+{{/each}}
+
+
+LICENSES
+--------
+{{#each licenses}}
+
+================================================================================
+{{{name}}}
+
+Used by:
+{{#each used_by}}
+  - {{crate.name}} {{crate.version}}
+{{/each}}
+--------------------------------------------------------------------------------
+
+{{{text}}}
+{{/each}}

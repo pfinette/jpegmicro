@@ -3,6 +3,8 @@ name = "jpegmicro"
 version = "0.1.0"
 edition = "2024"
 description = "Drop JPEGs on a window; they get smaller without looking different."
+license = "MIT"
+repository = "https://github.com/pfinette/jpegmicro"
 publish = false
 
 [lib]
