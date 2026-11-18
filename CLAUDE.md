@@ -1,8 +1,8 @@
 # JPEGmicro
 
-Personal ARM-native macOS app. Drop JPEGs or folders on the window. Each photo is re-encoded with MozJPEG at the lowest quality that DSSIM still scores as visually identical. The new file replaces the original in place, and the original goes to the Trash. It replaces JPEGmini, which only runs under Rosetta.
+ARM-native macOS app, published at github.com/pfinette/jpegmicro. Drop JPEGs or folders on the window. Each photo is re-encoded with MozJPEG at the lowest quality that DSSIM still scores as visually identical. The new file replaces the original in place, and the original goes to the Trash. It replaces JPEGmini, which only runs under Rosetta.
 
-Personal use only. It won't be distributed or notarized.
+Distributed as an ad-hoc-signed, unnotarized .app zip on GitHub Releases. Own code is MIT. See README for install steps and the license notice.
 
 ## Status
 
@@ -30,6 +30,7 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
 | `src/bin/cli.rs` | CLI with `--strict/--balanced/--aggressive`, `--min-saving N`, `--dry-run` |
 | `bundle.sh` | Builds the .app; makes the .icns with `sips` + `iconutil` |
 | `assets/icon.png` | 1024 px icon source (blue rounded square with "μ" and "JPEG") |
+| `about.toml`, `about.hbs` | cargo-about config. `cargo about generate about.hbs -o THIRD_PARTY_LICENSES` after any dependency change |
 
 ## Stack
 
@@ -37,7 +38,7 @@ The first build compiles MozJPEG from C (mozjpeg-sys). No nasm is needed on ARM.
 |---|---|---|
 | eframe / egui | 0.37 | New API: `App::ui(&mut self, ui, frame)`, `egui::Panel::top/bottom(id).show(ui, ..)`, `CentralPanel::default().show(ui, ..)`. `persistence` feature on. |
 | mozjpeg | 0.10 | Errors arrive as **panics**. All codec work is wrapped in `catch_unwind`, and `panic = "unwind"` is set in the release profile. |
-| dssim-core | 3.5 | AGPL-3.0. Fine for personal use. |
+| dssim-core | 3.5 | AGPL-3.0. Release binaries are therefore AGPL-3.0 as a whole; README and THIRD_PARTY_LICENSES say so. Replacing it with a permissive metric (e.g. ssimulacra2) would mean recalibrating the thresholds. |
 | rayon | 1 | File-level parallelism through `worker_pool()`, capped at 6 threads to bound memory |
 | trash | 5 | macOS uses `DeleteMethod::NsFileManager`, which avoids Finder's Automation permission prompt |
 | xattr | 1 | Copies extended attributes such as Finder tags. Best effort. |
