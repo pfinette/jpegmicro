@@ -79,7 +79,7 @@ Needs Rust (`rustup`) and the Xcode command-line tools (`xcode-select --install`
 git clone https://github.com/pfinette/jpegmicro.git
 cd jpegmicro
 ./bundle.sh            # builds target/JPEGmicro.app
-./bundle.sh --install  # also copies it to /Applications
+./bundle.sh --install  # also copies it to /Applications/Werkzeuge
 ```
 
 The first build compiles MozJPEG from C source and takes a few minutes. `bundle.sh` signs the app ad hoc, which is enough to run a copy you built yourself.

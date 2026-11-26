@@ -14,7 +14,7 @@ Distributed as an ad-hoc-signed, unnotarized .app zip on GitHub Releases. Own co
 
 ```sh
 ./bundle.sh                 # release build -> target/JPEGmicro.app (icon, Info.plist, ad-hoc codesign)
-./bundle.sh --install       # also copies to /Applications
+./bundle.sh --install       # also copies to /Applications/Werkzeuge
 cargo run --release --bin jpegmicro-cli -- --dry-run <files or folders>
 cargo run --release --bin jpegmicro -- <paths>   # GUI; paths on argv are processed at launch
 ```
@@ -128,7 +128,7 @@ Test set: 16 iPhone 14 Pro JPEGs (12 MP, 4:2:0, q≈93, GPS, Photos xattrs). The
 1. **Drag-and-drop** onto the window through `raw.dropped_files`. Check folders as well as files.
 2. **Trash.** Check that the original appears in the Trash and that no permission prompt appears in the GUI.
 3. **Photos and Preview** show the same date and location after processing.
-4. **bundle.sh.** Check the icon in the Dock and that the app launches from /Applications.
+4. **bundle.sh.** Check the icon in the Dock and that the app launches from /Applications/Werkzeuge.
 5. **Real 24 MP camera files** for both speed and savings.
 
 ## Ideas if it's too slow
